@@ -2,10 +2,18 @@ import streamlit as st
 import cv2
 import time
 import pandas as pd
+import os
 from focus_detector import FocusDetector
 
-# Page settings
+# ──────────────── ENVIRONMENT CHECK ────────────────
+def is_cloud():
+    return os.environ.get("HOME", "") == "/home/adminuser"
+
+# ──────────────── PAGE SETTINGS ────────────────
 st.set_page_config(page_title="Focus Session Tracker", layout="wide")
+
+if "log" not in st.session_state or not isinstance(st.session_state.log, list):
+    st.session_state.log = []
 
 # --- CSS Styling ---
 st.markdown("""
@@ -30,7 +38,6 @@ if "tasks" not in st.session_state:
 if "task_input" not in st.session_state:
     st.session_state.task_input = ""
 
-
 # --- Timer State Initialization ---
 for key, default in {
     "timer_running": False,
@@ -38,7 +45,6 @@ for key, default in {
     "session_duration": 0,
     "break_duration": 0,
     "break_start": None,
-    "log": [],
     "tracking": False,
     "start_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
 }.items():
@@ -112,7 +118,7 @@ def add_task():
     task = st.session_state.new_task.strip()
     if task:
         st.session_state.tasks.append(task)
-        st.session_state.new_task = ""  # This is safe because it's called before rendering the input again
+        st.session_state.new_task = ""
     else:
         st.warning("⚠️ Please enter a task.")
 
@@ -162,33 +168,36 @@ with st.container():
 
 # ─────────────────── CAMERA TRACKING ───────────────────
 if st.session_state.tracking:
-    cam = cv2.VideoCapture(0)
-    if not cam.isOpened():
-        st.error("❌ Failed to access the camera.")
+    if is_cloud():
+        st.warning("⚠️ Webcam tracking is not supported in the cloud. Please run this app locally.")
     else:
-        st.success("📹 Tracking is active. Press stop to end.")
-        while st.session_state.tracking:
-            ret, frame = cam.read()
-            if not ret:
-                st.error("❌ Camera read failed.")
-                break
+        cam = cv2.VideoCapture(0)
+        if not cam.isOpened():
+            st.error("❌ Failed to access the camera.")
+        else:
+            st.success("📹 Tracking is active. Press stop to end.")
+            while st.session_state.tracking:
+                ret, frame = cam.read()
+                if not ret:
+                    st.error("❌ Camera read failed.")
+                    break
 
-            frame = cv2.flip(frame, 1)
-            focused = detector.is_focused(frame)
-            status = "🟢 Focused" if focused else "🔴 Distracted"
+                frame = cv2.flip(frame, 1)
+                focused = detector.is_focused(frame)
+                status = "🟢 Focused" if focused else "🔴 Distracted"
 
-            st.session_state.log.append({
-                "timestamp": time.time(),
-                "status": status
-            })
+                st.session_state.log.append({
+                    "timestamp": time.time(),
+                    "status": status
+                })
 
-            cv2.putText(frame, status, (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1,
-                        (0, 255, 0) if focused else (0, 0, 255), 2)
+                cv2.putText(frame, status, (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1,
+                            (0, 255, 0) if focused else (0, 0, 255), 2)
 
-            FRAME_WINDOW.image(frame, channels="BGR")
-            time.sleep(0.1)
-        cam.release()
+                FRAME_WINDOW.image(frame, channels="BGR")
+                time.sleep(0.1)
+            cam.release()
 
 # ─────────────────── SAVE TIMER LOG ───────────────────
 with st.container():
@@ -229,7 +238,7 @@ with st.container():
 with st.container():
     if st.session_state.log:
         st.subheader("📝 Readable Log Summary")
-        for entry in reversed(st.session_state.log[-100:]):  # Last 10 entries
+        for entry in reversed(st.session_state.log[-100:]):
             readable_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(entry["timestamp"]))
             note = entry.get("note", "")
             st.markdown(f"- {readable_time} — {entry['status']} {'– ' + note if note else ''}")
