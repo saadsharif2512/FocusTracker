@@ -138,7 +138,7 @@ with st.expander("📝 To-Do List", expanded=True):
 
 # ─────────────────── TIMER DISPLAY ───────────────────
 with st.container():
-    st.subheader("⏱️ Live Timer Summary")
+    st.subheader("⏱️ Live timer summary")
 
     current_time = time.time()
     elapsed_session = st.session_state.session_duration
@@ -166,7 +166,7 @@ if st.session_state.tracking:
     if not cam.isOpened():
         st.error("❌ Failed to access the camera.")
     else:
-        st.success("📹 Tracking is active. Press Stop to end.")
+        st.success("📹 Tracking is active. Press stop to end.")
         while st.session_state.tracking:
             ret, frame = cam.read()
             if not ret:
